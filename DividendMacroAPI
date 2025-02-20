@@ -1,0 +1,51 @@
+Function Dividend(Ticker As String) As Double
+    Dim Http As Object
+    Dim JSON As Object
+    Dim APIKey As String
+    Dim URL As String
+    Dim Response As String
+
+    ' Set your Alpha Vantage API key here
+    APIKey = "PUTSOMETHINGHERE"
+
+    ' Construct the URL for the Alpha Vantage API
+    URL = "https://www.alphavantage.co/query?function=OVERVIEW&symbol=" & Ticker & "&apikey=" & APIKey
+
+    ' Create the HTTP request
+    Set Http = CreateObject("MSXML2.XMLHTTP")
+    On Error Resume Next
+    Http.Open "GET", URL, False
+    Http.Send
+    Response = Http.ResponseText
+    On Error GoTo 0
+
+    ' Debugging: Output the raw response to the Immediate Window
+    Debug.Print "Response: " & Response
+
+    ' Check for a valid response
+    If Len(Response) = 0 Or Response = "{}" Then
+        Debug.Print "Empty or Invalid Response"
+        Dividend = 0
+        Exit Function
+    End If
+
+    ' Parse the JSON response
+    On Error Resume Next
+    Set JSON = JsonConverter.ParseJson(Response)
+    On Error GoTo 0
+
+    ' Extract the dividend yield
+    If Not JSON Is Nothing Then
+        If JSON.Exists("DividendYield") Then
+            Debug.Print "DividendYield: " & JSON("DividendYield")
+            Dividend = CDbl(JSON("DividendYield"))
+        Else
+            Debug.Print "DividendYield Not Found"
+            Dividend = 0
+        End If
+    Else
+        Debug.Print "JSON Parsing Failed"
+        Dividend = 0
+    End If
+End Function
+
