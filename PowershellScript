@@ -1,0 +1,64 @@
+# Define the folder where files are downloaded
+$folderPath = "C:\Users\filepathway1"
+$archiveFolderPath = "C:\Users\filepathway2"
+
+# Define allowed file extensions and their new CSV names
+$fileMappings = @{
+    ".ULT" = "ULT.csv"
+    ".ULN" = "ULN.csv"
+    ".RPS" = "RPS.csv"
+    ".ACC" = "ACC.csv"
+}
+
+# Get yesterday’s date in YYYYMMDD format
+$yesterdayDate = (Get-Date).AddDays(-1).ToString("yyyyMMdd")
+
+# Get all files in the folder
+$files = Get-ChildItem -Path $folderPath
+
+# Step 1: Move existing renamed files to the archive before renaming new ones
+foreach ($csvFile in $fileMappings.Values) {
+    $existingFile = Join-Path $folderPath $csvFile
+    if (Test-Path $existingFile) {
+        $archivedFileName = $csvFile -replace "\.csv$", "_$yesterdayDate.csv"
+        $destinationPath = Join-Path $archiveFolderPath $archivedFileName
+        Move-Item -Path $existingFile -Destination $destinationPath -Force
+        Write-Host "Archived: $csvFile -> $archivedFileName"
+    }
+}
+
+# Step 2: Process new files
+foreach ($file in $files) {
+    if ($file.Name -match "^CRS(\d{8})") {
+        $fileDate = $matches[1]  # Extract YYYYMMDD from filename
+        $fileDateTime = [datetime]::ParseExact($fileDate, "yyyyMMdd", $null)
+        $fileAge = (Get-Date) - $fileDateTime
+        $fileExtension = $file.Extension
+
+        if ($fileMappings.ContainsKey($fileExtension)) {
+            # Rename and keep only yesterday's files
+            if ($fileDate -eq $yesterdayDate) {
+                $newFileName = $fileMappings[$fileExtension]
+                $newFilePath = Join-Path $folderPath $newFileName
+                Rename-Item -Path $file.FullName -NewName $newFilePath -Force
+                Write-Host "Renamed: $($file.Name) -> $newFileName"
+            }
+            # Move files older than 1 day to the archive folder
+            elseif ($fileAge.Days -ge 2) {
+                $destinationPath = Join-Path $archiveFolderPath $file.Name
+                Move-Item -Path $file.FullName -Destination $destinationPath -Force
+                Write-Host "Moved: $($file.Name) -> $destinationPath"
+            }
+            # Delete today’s files or any incorrect ones
+            else {
+                Write-Host "Deleting: $($file.Name) (Type: $fileExtension, Date: $fileDate)"
+                Remove-Item -Path $file.FullName -Force
+            }
+        }
+        # Delete any file that isn't in the allowed list
+        else {
+            Write-Host "Deleting: $($file.Name) (Type: $fileExtension)"
+            Remove-Item -Path $file.FullName -Force
+        }
+    }
+}
